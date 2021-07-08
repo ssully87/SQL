@@ -1,0 +1,129 @@
+USE [Bouchard_Data]
+GO
+
+/****** Object:  StoredProcedure [dbo].[Build_SBU_Top25]    Script Date: 7/8/2021 11:45:24 AM ******/
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+
+
+
+CREATE Procedure [dbo].[Build_SBU_Top25] 
+AS
+BEGIN
+WITH CTE_Serv AS
+(
+Select  C.CLIENTS_ID, SUM(P.EST_COMM_AMT) as BOB 
+	FROM [Welland_Export].[dbo].[POLICIES] P
+	INNER JOIN [Welland_Export].[dbo].[CLIENTS] C
+		   ON C.u2_id = P.CLIENTS_ID
+		   And c.DIVISION_CODE = 450
+	WHERE isnull(P.CNR, 'i') = 'i'
+	GROUP BY C.CLIENTS_ID
+)
+--select * from CTE
+,
+CTE2_Serv AS
+(
+	Select ROW_NUMBER() OVER (PARTITION BY CC.SERVICER_CODE_1 ORDER BY BOB desc) AS RowNum, CTE_Serv.CLIENTS_ID, CC.SERVICER_CODE_1, BOB from CTE_Serv
+	INNER JOIN Welland_Export.dbo.CLIENTS CC ON CC.CLIENTS_ID = CTE_Serv.CLIENTS_ID
+	INNER JOIN [Welland_Export].[dbo].[POLICIES] P ON CC.CLIENTS_ID = P.CLIENTS_ID
+	WHERE BOB IS NOT NULL
+	GROUP BY CTE_Serv.CLIENTS_ID, CC.SERVICER_CODE_1, BOB
+)
+--select * from CTE2_Serv
+	SELECT
+	CTE2_Serv.RowNum AS Top25_Servicer
+	,C.CLIENT_CODE
+	,C.CLIENTNAME
+	,C.SERVICER_CODE_1
+	,S.STAFFNAME
+	,CTE2_Serv.BOB
+	FROM [Welland_Export].[dbo].[POLICIES] P
+		INNER JOIN [Welland_Export].[dbo].[CLIENTS] C
+			ON C.u2_id = P.CLIENTS_ID
+			And c.DIVISION_CODE = 450 AND (C.CAT_CODE_1 = 'COM' OR C.CAT_CODE_2 = 'COM' OR C.CAT_CODE_3 = 'COM' OR C.CAT_CODE_4 = 'COM' OR C.CAT_CODE_5 = 'COM')  
+		--LEFT JOIN [Welland_Export].[dbo].ACD_CLIENTSERVPROD CSP
+		--	ON CSP.CLIENTS_ID = C.u2_id
+		--LEFT JOIN [Welland_Export].[dbo].ACD_BENCHMARKING B
+		--	ON B.CLIENTS_ID = C.u2_id
+		--INNER JOIN [Welland_Export].[dbo].INSURORS I
+		--	ON I.u2_id = P.INSURORS_ID
+		--INNER JOIN [Welland_Export].[dbo].PAYEES PA
+		--	ON PA.u2_id = P.PAYEES_ID
+		--INNER JOIN [Welland_Export].[dbo].COVERAGES Co
+		--	ON Co.u2_id = P.COVERAGES_ID
+		INNER JOIN Welland_Export.dbo.STAFF S on P.SERVICER_CODE_1 = S.STAFFCODE
+		INNER JOIN CTE2_Serv
+			ON CTE2_Serv.CLIENTS_ID = C.CLIENTS_ID AND CTE2_Serv.RowNum < 26 --OR CTE2_Serv.BOB > 4999.99)
+	WHERE ISNULL(P.CNR,  'i') = 'i' AND S.DEPT like '2%%%0' 
+	GROUP BY 
+	CTE2_Serv.RowNum
+	,C.CLIENT_CODE
+	,C.CLIENTNAME
+	,C.SERVICER_CODE_1
+	,S.STAFFNAME
+	,CTE2_Serv.BOB
+order by SERVICER_CODE_1, RowNum
+
+;
+WITH CTE_Serv AS
+(
+Select  C.CLIENTS_ID, SUM(P.EST_COMM_AMT) as BOB 
+	FROM [Welland_Export].[dbo].[POLICIES] P
+	INNER JOIN [Welland_Export].[dbo].[CLIENTS] C
+		   ON C.u2_id = P.CLIENTS_ID
+		   And c.DIVISION_CODE = 450
+	WHERE isnull(P.CNR, 'i') = 'i'
+	GROUP BY C.CLIENTS_ID
+)
+--select * from CTE
+,
+CTE2_Prod AS
+(
+	Select ROW_NUMBER() OVER (PARTITION BY CC.PRODUCER_CODE_1 ORDER BY BOB desc) AS RowNum, CTE_Serv.CLIENTS_ID, CC.PRODUCER_CODE_1, BOB from CTE_Serv
+	INNER JOIN Welland_Export.dbo.CLIENTS CC ON CC.CLIENTS_ID = CTE_Serv.CLIENTS_ID
+	INNER JOIN [Welland_Export].[dbo].[POLICIES] P ON CC.CLIENTS_ID = P.CLIENTS_ID
+	WHERE BOB IS NOT NULL
+	GROUP BY CTE_Serv.CLIENTS_ID, CC.PRODUCER_CODE_1, BOB
+)
+--select * from CTE2_Serv
+	SELECT
+	CTE2_Prod.RowNum AS Top25_Servicer
+	,C.CLIENT_CODE
+	,C.CLIENTNAME
+	,C.PRODUCER_CODE_1
+	,S.STAFFNAME
+	,CTE2_Prod.BOB
+	FROM [Welland_Export].[dbo].[POLICIES] P
+		INNER JOIN [Welland_Export].[dbo].[CLIENTS] C
+			ON C.u2_id = P.CLIENTS_ID
+			And c.DIVISION_CODE = 450 AND (C.CAT_CODE_1 = 'COM' OR C.CAT_CODE_2 = 'COM' OR C.CAT_CODE_3 = 'COM' OR C.CAT_CODE_4 = 'COM' OR C.CAT_CODE_5 = 'COM')  
+		--LEFT JOIN [Welland_Export].[dbo].ACD_CLIENTSERVPROD CSP
+		--	ON CSP.CLIENTS_ID = C.u2_id
+		--LEFT JOIN [Welland_Export].[dbo].ACD_BENCHMARKING B
+		--	ON B.CLIENTS_ID = C.u2_id
+		--INNER JOIN [Welland_Export].[dbo].INSURORS I
+		--	ON I.u2_id = P.INSURORS_ID
+		--INNER JOIN [Welland_Export].[dbo].PAYEES PA
+		--	ON PA.u2_id = P.PAYEES_ID
+		--INNER JOIN [Welland_Export].[dbo].COVERAGES Co
+		--	ON Co.u2_id = P.COVERAGES_ID
+		INNER JOIN Welland_Export.dbo.STAFF S on P.PRODUCER_CODE_1 = S.STAFFCODE
+		INNER JOIN CTE2_Prod
+			ON CTE2_Prod.CLIENTS_ID = C.CLIENTS_ID AND CTE2_Prod.RowNum < 26 --OR CTE2_Serv.BOB > 4999.99)
+	WHERE ISNULL(P.CNR,  'i') = 'i' AND S.DEPT like '2%%%0' 
+	GROUP BY 
+	CTE2_Prod.RowNum
+	,C.CLIENT_CODE
+	,C.CLIENTNAME
+	,C.PRODUCER_CODE_1
+	,S.STAFFNAME
+	,CTE2_Prod.BOB
+order by PRODUCER_CODE_1, RowNum
+;
+END
+GO
